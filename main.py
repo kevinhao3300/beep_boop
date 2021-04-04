@@ -27,13 +27,12 @@ client = discord.Client(intents=intents)
 start_msg_id = None
 guild_to_teams = {}
 
-MAPS = ['Bind', 'Split', 'Haven', 'Icebox', 'Ascent']
+MAPS = ['Bind', 'Split', 'Haven', 'Iceb <:OMEGALUL:821118232614273105> x', 'Ascent']
 
 
 @client.event
 async def on_ready():
     print('Logged in as {0.user}'.format(client))
-    
 
 @client.event
 async def on_message(message):
@@ -48,6 +47,7 @@ async def on_message(message):
         output_string += "\t$start - start matchmaking process\n"
         output_string += "\t$make - create teams from people who reacted to the $start message\n"
         output_string += "\t$move - move players to generated teams' voice channels\n"
+        output_string += "\t$clean - reset players and remove created voice channels\n"
         output_string += "\t$help - list available commands"
         await message.channel.send(output_string)
 
@@ -131,6 +131,27 @@ async def on_message(message):
             guild_to_teams[message.guild.id]['defenders'] = defenders
             # send output
             await message.channel.send(output_string)
+    
+    if message.content.startswith('$clean'):
+        # find VALORANT voice channels
+        guild = message.guild
+        for vc in guild.voice_channels:
+            # ignore voice channels outside of VALORANT
+            if vc.category != None and vc.category.name.lower() != 'valorant':
+                continue
+            if vc.name.lower() == 'attackers':
+                await vc.delete()
+                await message.channel.send('Attacker voice channel deleted.')
+            elif vc.name.lower() == 'defenders':
+                await vc.delete()
+                await message.channel.send('Defender voice channel deleted.')
+        # delete VALORANT category
+        for category in guild.categories:
+            if category.name.lower() == 'valorant':
+                await category.delete()
+                await message.channel.send('VALORANT category deleted.')
+        guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
+        await message.channel.send('Players emptied.')
 
 
 keep_alive()
