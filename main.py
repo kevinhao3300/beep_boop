@@ -35,6 +35,34 @@ async def on_ready():
     print('Logged in as {0.user}'.format(client))
 
 @client.event
+async def on_voice_state_update(member, before, after):
+    '''
+    Clean up created voice channels if they're empty.
+    (could be less janky if we kept track of the created voice channels explicitly)
+    '''
+    if before.channel == None or before.channel.category.name.lower() != 'valorant':
+        return
+    guild = before.channel.guild
+    attackers_vc = defenders_vc = None
+    # find channels
+    for vc in guild.voice_channels:
+        if vc.category == None or vc.category.name.lower() != 'valorant':
+            continue
+        if vc.name.lower() == 'attackers':
+            attackers_vc = vc
+        elif vc.name.lower() == 'defenders':
+            defenders_vc = vc
+    # delete VALORANT channels if they're empty
+    if attackers_vc != None and defenders_vc != None:
+        if len(attackers_vc.members) == len(defenders_vc.members) == 0:
+            await attackers_vc.delete()
+            await defenders_vc.delete()
+            for category in guild.categories:
+                if category.name.lower() == 'valorant':
+                    await category.delete()
+
+
+@client.event
 async def on_message(message):
     global start_msg_id
     
@@ -47,6 +75,7 @@ async def on_message(message):
         output_string += "\t$start - start matchmaking process\n"
         output_string += "\t$make - create teams from people who reacted to the $start message\n"
         output_string += "\t$move - move players to generated teams' voice channels\n"
+        output_string += "\t$back - move all players into attacker voice channel\n"
         output_string += "\t$clean - reset players and remove created voice channels\n"
         output_string += "\t$help - list available commands"
         await message.channel.send(output_string)
@@ -54,7 +83,7 @@ async def on_message(message):
     if message.content.startswith('$start'):
         start_msg = await message.channel.send("React to this message if you're playing :)")
         start_msg_id = start_msg.id
-        guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
+        # guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
 
     if message.content.startswith('$move'):
         if message.guild.id not in guild_to_teams:
@@ -107,6 +136,7 @@ async def on_message(message):
             await message.channel.send('use $start before $make')
         else:
             # read reacts
+            guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
             start_msg = await message.channel.fetch_message(start_msg_id)
             players = set()
             for reaction in start_msg.reactions:
@@ -132,6 +162,20 @@ async def on_message(message):
             # send output
             await message.channel.send(output_string)
     
+    if message.content.startswith('$back'):
+        # find VALORANT voice channels
+        guild = message.guild
+        for vc in guild.voice_channels:
+            # ignore voice channels outside of VALORANT
+            if vc.category != None and vc.category.name.lower() != 'valorant':
+                continue
+            elif vc.name.lower() == 'defenders':
+                for vc2 in guild.voice_channels:
+                    if vc2.name.lower() == 'attackers':
+                        for defender in vc.members:
+                            await defender.move_to(vc2)
+                        await message.channel.send('✅')
+
     if message.content.startswith('$clean'):
         # find VALORANT voice channels
         guild = message.guild
