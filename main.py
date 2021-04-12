@@ -17,10 +17,12 @@ import trueskill as ts
 #     ret += f'{k}: {db[k]}\n'
 #   return ret
 
-# def clear_db():
-#   for k in db.keys():
-#     del db[k]
-        
+def clear_db():
+  for k in db.keys():
+    del db[k]
+
+# clear_db()
+
 intents = discord.Intents.default()
 intents.members = True
 client = discord.Client(intents=intents)
@@ -39,6 +41,8 @@ def get_skill(userid):
     '''
     Returns the TrueSkill rating of a discord user.
     Will initialize skill if none is found.
+    :param userid: Discord userid to find
+    :return: stored TrueSkill rating object of userid
     '''
     if userid in db.keys():
         mu, sigma = db[userid]
@@ -50,7 +54,9 @@ def get_skill(userid):
 def record_result(winning_team, losing_team):
     '''
     Updates the TrueSkill ratings given a result.
-    Parameters are lists of Discord user ids.
+    :param winning_team: list of userids of players on the winning team
+    :param losing_team: list of userids of players on the losing team
+    :return: old winning team ratings, old losing team ratings, new winning team ratings, new losing team ratings
     '''
     winning_team_ratings = {id : get_skill(id) for id in winning_team}
     losing_team_ratings = {id : get_skill(id) for id in losing_team}
@@ -64,8 +70,9 @@ def record_result(winning_team, losing_team):
 def make_teams(players, pool=10):
     '''
     Make teams based on rating.
+    :param players: list of userid of participating players
     :param pool: number of matches to generate from which the best is chosen
-    :return: attackers, defenders, quality
+    :return: attackers (list of userids), defenders (list of userids), predicted quality of match
     '''
     player_ratings = {id : get_skill(id) for id in players}
     attackers = defenders = []
@@ -83,6 +90,10 @@ def make_teams(players, pool=10):
     return attackers, defenders, best_quality
 
 def get_leaderboard():
+    '''
+    Gets list of userids and TrueSkill ratings, sorted by current rating
+    :return: list of (userid, TrueSkill.Rating) tuples, sorted by rating
+    '''
     ratings = {id : get_skill(id) for id in db.keys()}
     return sorted(ratings.items(), key=lambda x: x[1].mu, reverse=True)
 
@@ -130,12 +141,12 @@ async def on_message(message):
     if message.content.startswith('$help'):
         output_string = "Available Commands:\n"
         output_string += "\t$start - start matchmaking process\n"
-        output_string += "\t$make - create teams from people who reacted to the $start message\n"
-        output_string += "\t$rated - create teams based on MMR\n"
-        output_string += "\t$attackers - record a win for the attackers\n"
-        output_string += "\t$defenders - record a win for the defenders\n"
-        output_string += "\t$move - move players to generated teams' voice channels\n"
-        output_string += "\t$back - move all players into attacker voice channel\n"
+        output_string += "\t\t$make - create random teams from reactions to $start message\n"
+        output_string += "\t\t$rated - create teams based on MMR\n"
+        output_string += "\t\t\t$attackers - record a win for the attackers\n"
+        output_string += "\t\t\t$defenders - record a win for the defenders\n"
+        output_string += "\t\t$move - move players to generated teams' voice channels\n"
+        output_string += "\t\t$back - move all players into attacker voice channel\n"
         output_string += "\t$clean - reset players and remove created voice channels\n"
         output_string += "\t$help - list available commands"
         await message.channel.send(output_string)
