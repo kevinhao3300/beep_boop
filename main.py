@@ -1,8 +1,9 @@
 import discord
 import os
 import random
-# from replit import db
+from replit import db
 from keep_alive import keep_alive
+import trueskill as ts
 
 # def update_db(k,v):
 #   if k in db.keys():
@@ -19,7 +20,7 @@ from keep_alive import keep_alive
 # def clear_db():
 #   for k in db.keys():
 #     del db[k]
-    
+        
 intents = discord.Intents.default()
 intents.members = True
 client = discord.Client(intents=intents)
@@ -28,6 +29,62 @@ start_msg_id = None
 guild_to_teams = {}
 
 MAPS = ['Bind', 'Split', 'Haven', 'Iceb <:OMEGALUL:821118232614273105> x', 'Ascent']
+
+# TrueSkill Rating Settings
+env = ts.TrueSkill(draw_probability=0.05)
+env.make_as_global()
+
+# TrueSkill DB helper functions
+def get_skill(userid):
+    '''
+    Returns the TrueSkill rating of a discord user.
+    Will initialize skill if none is found.
+    '''
+    if userid in db.keys():
+        mu, sigma = db[userid]
+        return ts.Rating(mu, sigma)
+    new_rating = ts.Rating()
+    db[userid] = new_rating.mu, new_rating.sigma
+    return new_rating
+
+def record_result(winning_team, losing_team):
+    '''
+    Updates the TrueSkill ratings given a result.
+    Parameters are lists of Discord user ids.
+    '''
+    winning_team_ratings = {id : get_skill(id) for id in winning_team}
+    losing_team_ratings = {id : get_skill(id) for id in losing_team}
+    winning_team_ratings_new, losing_team_ratings_new = ts.rate([winning_team_ratings, losing_team_ratings], [0,1])
+    for id in winning_team_ratings:
+        db[id] = winning_team_ratings_new[id].mu, winning_team_ratings_new[id].sigma
+    for id in losing_team_ratings:
+        db[id] = losing_team_ratings_new[id].mu, losing_team_ratings_new[id].sigma
+    return winning_team_ratings, losing_team_ratings, winning_team_ratings_new, losing_team_ratings_new
+
+def make_teams(players, pool=10):
+    '''
+    Make teams based on rating.
+    :param pool: number of matches to generate from which the best is chosen
+    :return: attackers, defenders, quality
+    '''
+    player_ratings = {id : get_skill(id) for id in players}
+    attackers = defenders = []
+    best_quality = 0.0
+    for i in range(pool):
+        random.shuffle(players)
+        team_size = len(players) // 2
+        t1 = {id : player_ratings[id] for id in players[:team_size]}
+        t2 = {id : player_ratings[id] for id in players[team_size:]}
+        quality = ts.quality([t1, t2])
+        if quality > best_quality:
+            attackers = list(t1.keys())
+            defenders = list(t2.keys())
+            best_quality = quality
+    return attackers, defenders, best_quality
+
+def get_leaderboard():
+    ratings = {id : get_skill(id) for id in db.keys()}
+    return sorted(ratings.items(), key=lambda x: x[1].mu, reverse=True)
 
 
 @client.event
@@ -74,6 +131,9 @@ async def on_message(message):
         output_string = "Available Commands:\n"
         output_string += "\t$start - start matchmaking process\n"
         output_string += "\t$make - create teams from people who reacted to the $start message\n"
+        output_string += "\t$rated - create teams based on MMR\n"
+        output_string += "\t$attackers - record a win for the attackers\n"
+        output_string += "\t$defenders - record a win for the defenders\n"
         output_string += "\t$move - move players to generated teams' voice channels\n"
         output_string += "\t$back - move all players into attacker voice channel\n"
         output_string += "\t$clean - reset players and remove created voice channels\n"
@@ -85,6 +145,108 @@ async def on_message(message):
         start_msg_id = start_msg.id
         # guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
 
+    if message.content.startswith('$make'):
+        # read reacts and make teams accordingly
+        if start_msg_id is None:
+            await message.channel.send('use $start before $make')
+        else:
+            # read reacts
+            guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
+            start_msg = await message.channel.fetch_message(start_msg_id)
+            players = set()
+            for reaction in start_msg.reactions:
+                users = await reaction.users().flatten()
+                players.update((user.id for user in users))
+            # create teams
+            players = list(players)
+            random.shuffle(players)
+            team_size = len(players) // 2
+            attackers = players[:team_size]
+            defenders = players[team_size:]
+            # create output
+            output_string = f"Map: {random.choice(MAPS)}\n" 
+            output_string += "\nAttackers:\n"
+            for member in attackers:
+                output_string += f'\t<@!{member}>'
+            output_string += "\n\nDefenders:\n"
+            for member in defenders:
+                output_string += f'\t<@!{member}>'
+            # store teams
+            guild_to_teams[message.guild.id]['attackers'] = attackers
+            guild_to_teams[message.guild.id]['defenders'] = defenders
+            # send output
+            await message.channel.send(output_string)
+    
+    if message.content.startswith('$rated'):
+        if start_msg_id is None:
+            await message.channel.send('use $start before $rated')
+        else:
+            # read reacts
+            guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
+            start_msg = await message.channel.fetch_message(start_msg_id)
+            players = set()
+            for reaction in start_msg.reactions:
+                users = await reaction.users().flatten()
+                players.update((user.id for user in users))
+            # must have at least one member on each team
+            if len(players) < 2:
+                await message.channel.send('must have at least 2 players for rated game')
+                return
+            # create teams
+            attackers, defenders, quality = make_teams(list(players))
+            # create output
+            output_string = f'Map: {random.choice(MAPS)}    Predicted Quality: {round(quality*200, 2)}\n'
+            output_string += "\nAttackers:\n"
+            for member in attackers:
+                output_string += f'\t<@!{member}>({round(get_skill(member).mu, 2)}) '
+            output_string += "\n\nDefenders:\n"
+            for member in defenders:
+                output_string += f'\t<@!{member}>({round(get_skill(member).mu, 2)}) '
+            # store teams
+            guild_to_teams[message.guild.id]['attackers'] = attackers
+            guild_to_teams[message.guild.id]['defenders'] = defenders
+            # send output
+            await message.channel.send(output_string)
+    
+    if message.content.startswith('$attackers'):
+        if not guild_to_teams[message.guild.id]['attackers']:
+            await message.channel.send('use $make or $rated before recording a result')
+        else:
+            attackers, defenders, attackers_new, defenders_new = record_result(guild_to_teams[message.guild.id]['attackers'], guild_to_teams[message.guild.id]['defenders'])
+            output_string = 'Win for Attackers recorded.\n'
+            output_string += "\nAttackers:\n"
+            for member in attackers:
+                output_string += f'\t<@!{member}> ({round(attackers[member].mu, 2)} -> {round(attackers_new[member].mu, 2)})\n'
+            output_string += "\n\nDefenders:\n"
+            for member in defenders:
+                output_string += f'\t<@!{member}> ({round(defenders[member].mu, 2)} -> {round(defenders_new[member].mu, 2)})\n'
+            # send output
+            await message.channel.send(output_string)
+    
+    if message.content.startswith('$defenders'):
+        if not guild_to_teams[message.guild.id]['defenders']:
+            await message.channel.send('use $make or $rated before recording a result')
+        else:
+            defenders, attackers, defenders_new, attackers_new = record_result(guild_to_teams[message.guild.id]['defenders'], guild_to_teams[message.guild.id]['attackers'])
+            output_string = 'Win for Defenders recorded.\n'
+            output_string += "\nAttackers:\n"
+            for member in attackers:
+                output_string += f'\t<@!{member}> ({round(attackers[member].mu, 2)} -> {round(attackers_new[member].mu, 2)})\n'
+            output_string += "\n\nDefenders:\n"
+            for member in defenders:
+                output_string += f'\t<@!{member}> ({round(defenders[member].mu, 2)} -> {round(defenders_new[member].mu, 2)})\n'
+            # send output
+            await message.channel.send(output_string)
+
+    if message.content.startswith('$leaderboard'):
+        leaderboard = get_leaderboard()
+        output_string = 'Ratings:\n'
+        for item in leaderboard:
+            member = message.guild.get_member(int(item[0]))
+            if member:
+                output_string += f'\t{member.name} - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
+        await message.channel.send(output_string)
+    
     if message.content.startswith('$move'):
         if message.guild.id not in guild_to_teams:
             await message.channel.send("Use $start to begin matchmaking.")
@@ -128,39 +290,6 @@ async def on_message(message):
             if member.voice is not None:
                 await member.move_to(defender_channel)
         await message.channel.send("Available players moved.")
-
-    
-    if message.content.startswith('$make'):
-        # read reacts and make teams accordingly
-        if start_msg_id is None:
-            await message.channel.send('use $start before $make')
-        else:
-            # read reacts
-            guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
-            start_msg = await message.channel.fetch_message(start_msg_id)
-            players = set()
-            for reaction in start_msg.reactions:
-                users = await reaction.users().flatten()
-                players.update((user.id for user in users))
-            # create teams
-            players = list(players)
-            random.shuffle(players)
-            team_size = len(players) // 2
-            attackers = players[:team_size]
-            defenders = players[team_size:]
-            # create output
-            output_string = f"Map: {random.choice(MAPS)}\n" 
-            output_string += "\nAttackers:\n"
-            for member in attackers:
-                output_string += f'\t<@!{member}>'
-            output_string += "\n\nDefenders:\n"
-            for member in defenders:
-                output_string += f'\t<@!{member}>'
-            # store teams
-            guild_to_teams[message.guild.id]['attackers'] = attackers
-            guild_to_teams[message.guild.id]['defenders'] = defenders
-            # send output
-            await message.channel.send(output_string)
     
     if message.content.startswith('$back'):
         # find VALORANT voice channels
