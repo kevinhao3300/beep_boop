@@ -147,6 +147,7 @@ async def on_message(message):
         output_string += "\t\t\t$defenders - record a win for the defenders\n"
         output_string += "\t\t$move - move players to generated teams' voice channels\n"
         output_string += "\t\t$back - move all players into attacker voice channel\n"
+        output_string += "\t$rating - get your current rating\n"
         output_string += "\t$clean - reset players and remove created voice channels\n"
         output_string += "\t$help - list available commands"
         await message.channel.send(output_string)
@@ -315,6 +316,11 @@ async def on_message(message):
                         for defender in vc.members:
                             await defender.move_to(vc2)
                         await message.channel.send('✅')
+
+    if message.content.startswith('$rating'):
+        authorid = message.author.id
+        skill = get_skill(authorid)
+        await message.channel.send(f'\t<@!{authorid}> - {round(skill.mu, 4)} ± {round(skill.sigma, 2)}')
 
     if message.content.startswith('$clean'):
         # find VALORANT voice channels
