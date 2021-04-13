@@ -108,7 +108,7 @@ async def on_voice_state_update(member, before, after):
     Clean up created voice channels if they're empty.
     (could be less janky if we kept track of the created voice channels explicitly)
     '''
-    if before.channel == None or before.channel.category.name.lower() != 'valorant':
+    if before.channel == None or before.channel.category == None or before.channel.category.name.lower() != 'valorant':
         return
     guild = before.channel.guild
     attackers_vc = defenders_vc = None
@@ -140,7 +140,7 @@ async def on_message(message):
 
     if message.content.startswith('$help'):
         output_string = "Available Commands:\n"
-        output_string += "\t$start - start matchmaking process\n"
+        output_string += "\t$start - start matchmaking process, bot sends message for players to react to\n"
         output_string += "\t\t$make - create random teams from reactions to $start message\n"
         output_string += "\t\t$rated - create teams based on MMR\n"
         output_string += "\t\t\t$attackers - record a win for the attackers\n"
@@ -318,9 +318,14 @@ async def on_message(message):
                         await message.channel.send('✅')
 
     if message.content.startswith('$rating'):
-        authorid = message.author.id
-        skill = get_skill(authorid)
-        await message.channel.send(f'\t<@!{authorid}> - {round(skill.mu, 4)} ± {round(skill.sigma, 2)}')
+        if message.raw_mentions:
+            for id in message.raw_mentions:
+                skill = get_skill(id)
+                await message.channel.send(f'\t<@!{id}> - {round(skill.mu, 4)} ± {round(skill.sigma, 2)}\n')
+        else:
+            authorid = message.author.id
+            skill = get_skill(authorid)
+            await message.channel.send(f'\t<@!{authorid}> - {round(skill.mu, 4)} ± {round(skill.sigma, 2)}')
 
     if message.content.startswith('$clean'):
         # find VALORANT voice channels
