@@ -21,7 +21,7 @@ def clear_db():
   for k in db.keys():
     del db[k]
 
-# clear_db()
+ADMINS = [335828416412778496, 263745246821744640] # discord ids of users w/ admin privledges
 
 intents = discord.Intents.default()
 intents.members = True
@@ -46,7 +46,7 @@ def get_skill(userid):
     '''
     if userid in db.keys():
         mu, sigma = db[userid]
-        return ts.Rating(mu, sigma)
+        return ts.Rating(float(mu), float(sigma))
     new_rating = ts.Rating()
     db[userid] = new_rating.mu, new_rating.sigma
     return new_rating
@@ -347,7 +347,13 @@ async def on_message(message):
                 await message.channel.send('VALORANT category deleted.')
         guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
         await message.channel.send('Players emptied.')
-
+    
+    if message.content.startswith('$cleardb'):
+        if message.author.id in ADMINS:
+            clear_db()
+            await message.channel.send('Databased cleared.')
+        else:
+            await message.channel.send('Permission denied.')
 
 keep_alive()
 client.run(os.getenv('TOKEN'))
