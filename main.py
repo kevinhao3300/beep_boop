@@ -27,7 +27,7 @@ intents = discord.Intents.default()
 intents.members = True
 client = discord.Client(intents=intents)
 
-start_msg_id = None
+guild_to_start_msg_id = dict()
 guild_to_teams = {}
 
 MAPS = ['Bind', 'Split', 'Haven', 'Iceb <:OMEGALUL:821118232614273105> x', 'Ascent']
@@ -95,7 +95,7 @@ def get_leaderboard():
     :return: list of (userid, TrueSkill.Rating) tuples, sorted by rating
     '''
     ratings = {id : get_skill(id) for id in db.keys()}
-    return sorted(ratings.items(), key=lambda x: x[1].mu, reverse=True)
+    return sorted(ratings.items(), key=lambda x: (x[1].mu, -x[1].sigma), reverse=True)
 
 
 @client.event
@@ -129,10 +129,8 @@ async def on_voice_state_update(member, before, after):
                 if category.name.lower() == 'valorant':
                     await category.delete()
 
-
 @client.event
 async def on_message(message):
-    global start_msg_id
     
     # ignore your own messages
     if message.author == client:
@@ -148,23 +146,24 @@ async def on_message(message):
         output_string += "\t\t$move - move players to generated teams' voice channels\n"
         output_string += "\t\t$back - move all players into attacker voice channel\n"
         output_string += "\t$rating - get your current rating\n"
+        output_string += "\t$leaderboard - get players sorted by rating\n"
         output_string += "\t$clean - reset players and remove created voice channels\n"
         output_string += "\t$help - list available commands"
         await message.channel.send(output_string)
 
     if message.content.startswith('$start'):
         start_msg = await message.channel.send("React to this message if you're playing :)")
-        start_msg_id = start_msg.id
+        guild_to_start_msg_id[message.guild.id] = start_msg.id
         # guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
 
     if message.content.startswith('$make'):
         # read reacts and make teams accordingly
-        if start_msg_id is None:
+        if message.guild.id not in guild_to_start_msg_id or guild_to_start_msg_id[message.guild.id] is None:
             await message.channel.send('use $start before $make')
         else:
             # read reacts
             guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
-            start_msg = await message.channel.fetch_message(start_msg_id)
+            start_msg = await message.channel.fetch_message(guild_to_start_msg_id[message.guild.id])
             players = set()
             for reaction in start_msg.reactions:
                 users = await reaction.users().flatten()
@@ -190,12 +189,12 @@ async def on_message(message):
             await message.channel.send(output_string)
     
     if message.content.startswith('$rated'):
-        if start_msg_id is None:
+        if message.guild.id not in guild_to_start_msg_id or guild_to_start_msg_id[message.guild.id] is None:
             await message.channel.send('use $start before $rated')
         else:
             # read reacts
             guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
-            start_msg = await message.channel.fetch_message(start_msg_id)
+            start_msg = await message.channel.fetch_message(guild_to_start_msg_id[message.guild.id])
             players = set()
             for reaction in start_msg.reactions:
                 users = await reaction.users().flatten()
@@ -253,10 +252,17 @@ async def on_message(message):
     if message.content.startswith('$leaderboard'):
         leaderboard = get_leaderboard()
         output_string = 'Ratings:\n'
+        rank = 0
+        last = 0, 0
         for item in leaderboard:
             member = message.guild.get_member(int(item[0]))
             if member:
-                output_string += f'\t{member.name} - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
+                if (item[1].mu, item[1].sigma) == last:
+                    output_string += f'\t{rank}. {member.name} - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
+                else:
+                    rank += 1
+                    output_string += f'\t{rank}. {member.name} - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
+                last = item[1].mu, item[1].sigma
         await message.channel.send(output_string)
     
     if message.content.startswith('$move'):
@@ -356,4 +362,4 @@ async def on_message(message):
             await message.channel.send('Permission denied.')
 
 keep_alive()
-client.run(os.getenv('TOKEN'))
+client.run(os.getenv('TOKEN_TEMP'))
