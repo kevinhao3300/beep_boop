@@ -23,6 +23,7 @@ def clear_db():
     del db[k]
 
 ADMINS = [335828416412778496, 263745246821744640] # discord ids of users w/ admin privledges
+GOOD_BOTS = [833472758738190356, 834637993779527722]
 
 intents = discord.Intents.default()
 intents.members = True
@@ -148,7 +149,7 @@ async def on_voice_state_update(member, before, after):
         elif vc.name.lower() == 'defenders':
             defenders_vc = vc
     # delete VALORANT channels if they're empty
-    if attackers_vc != None and defenders_vc != None:
+    if attackers_vc is not None and defenders_vc is not None:
         if len(attackers_vc.members) == len(defenders_vc.members) == 0:
             await attackers_vc.delete()
             await defenders_vc.delete()
@@ -341,7 +342,7 @@ async def on_message(message):
         guild = message.guild
         for vc in guild.voice_channels:
             # ignore voice channels outside of VALORANT
-            if vc.category != None and vc.category.name.lower() != 'valorant':
+            if vc.category is not None and vc.category.name.lower() != 'valorant':
                 continue
             elif vc.name.lower() == 'defenders':
                 for vc2 in guild.voice_channels:
@@ -360,12 +361,13 @@ async def on_message(message):
             skill = get_skill(authorid)
             await message.channel.send(f'\t<@!{authorid}> - {round(skill.mu, 4)} ± {round(skill.sigma, 2)}')
 
+    # remove valorant category and voice channels
     if message.content.startswith('$clean'):
         # find VALORANT voice channels
         guild = message.guild
         for vc in guild.voice_channels:
             # ignore voice channels outside of VALORANT
-            if vc.category != None and vc.category.name.lower() != 'valorant':
+            if vc.category is not None and vc.category.name.lower() != 'valorant':
                 continue
             if vc.name.lower() == 'attackers':
                 await vc.delete()
@@ -381,12 +383,17 @@ async def on_message(message):
         guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
         await message.channel.send('Players emptied.')
     
+    # admin-only clearing of repl db
     if message.content.startswith('$cleardb'):
         if message.author.id in ADMINS:
             clear_db()
             await message.channel.send('Databased cleared.')
         else:
             await message.channel.send('Permission denied.')
+
+    # anti good-bot
+    if message.author.id in GOOD_BOTS:
+        await message.delete()
 
 keep_alive()
 client.run(os.getenv('TOKEN'))
