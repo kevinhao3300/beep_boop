@@ -11,11 +11,12 @@ import trueskill as ts
 #   else:
 #     db[k] = [v]
 
-# def db_string():
-#   ret = ''
-#   for k in db.keys():
-#     ret += f'{k}: {db[k]}\n'
-#   return ret
+def db_string():
+  ret = ''
+  for k in db.keys():
+    ret += f'db[{k}] = {db[k]}\n'
+    print(type(db[k][0]))
+  return ret
 
 def clear_db():
   for k in db.keys():
@@ -27,7 +28,7 @@ intents = discord.Intents.default()
 intents.members = True
 client = discord.Client(intents=intents)
 
-guild_to_start_msg_id = dict()
+guild_to_start_msg = dict()
 guild_to_teams = {}
 
 MAPS = ['Bind', 'Split', 'Haven', 'Iceb <:OMEGALUL:821118232614273105> x', 'Ascent']
@@ -103,6 +104,32 @@ async def on_ready():
     print('Logged in as {0.user}'.format(client))
 
 @client.event
+async def on_raw_reaction_add(payload):
+    # update start message with reactors
+    if payload.guild_id in guild_to_start_msg and payload.message_id == guild_to_start_msg[payload.guild_id].id:
+        channel = client.get_channel(payload.channel_id)
+        start_msg = await channel.fetch_message(guild_to_start_msg[payload.guild_id].id)
+        players = set()
+        for reaction in start_msg.reactions:
+            users = await reaction.users().flatten()
+            players.update((user.id for user in users))
+        output_message = "React to this message if you're playing" + ','.join([f'\t<@!{member}>' for member in players])
+        await start_msg.edit(content=output_message)
+
+@client.event
+async def on_raw_reaction_remove(payload):
+    # update start message with reactors
+    if payload.guild_id in guild_to_start_msg and payload.message_id == guild_to_start_msg[payload.guild_id].id:
+        channel = client.get_channel(payload.channel_id)
+        start_msg = await channel.fetch_message(guild_to_start_msg[payload.guild_id].id)
+        players = set()
+        for reaction in start_msg.reactions:
+            users = await reaction.users().flatten()
+            players.update((user.id for user in users))
+        output_message = "React to this message if you're playing" + ','.join([f'\t<@!{member}>' for member in players])
+        await start_msg.edit(content=output_message)
+
+@client.event
 async def on_voice_state_update(member, before, after):
     '''
     Clean up created voice channels if they're empty.
@@ -153,17 +180,17 @@ async def on_message(message):
 
     if message.content.startswith('$start'):
         start_msg = await message.channel.send("React to this message if you're playing :)")
-        guild_to_start_msg_id[message.guild.id] = start_msg.id
+        guild_to_start_msg[message.guild.id] = start_msg
         # guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
 
     if message.content.startswith('$make'):
         # read reacts and make teams accordingly
-        if message.guild.id not in guild_to_start_msg_id or guild_to_start_msg_id[message.guild.id] is None:
+        if message.guild.id not in guild_to_start_msg or guild_to_start_msg[message.guild.id] is None:
             await message.channel.send('use $start before $make')
         else:
             # read reacts
             guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
-            start_msg = await message.channel.fetch_message(guild_to_start_msg_id[message.guild.id])
+            start_msg = await message.channel.fetch_message(guild_to_start_msg[message.guild.id].id)
             players = set()
             for reaction in start_msg.reactions:
                 users = await reaction.users().flatten()
@@ -189,12 +216,12 @@ async def on_message(message):
             await message.channel.send(output_string)
     
     if message.content.startswith('$rated'):
-        if message.guild.id not in guild_to_start_msg_id or guild_to_start_msg_id[message.guild.id] is None:
+        if message.guild.id not in guild_to_start_msg or guild_to_start_msg[message.guild.id] is None:
             await message.channel.send('use $start before $rated')
         else:
             # read reacts
             guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
-            start_msg = await message.channel.fetch_message(guild_to_start_msg_id[message.guild.id])
+            start_msg = await message.channel.fetch_message(guild_to_start_msg[message.guild.id].id)
             players = set()
             for reaction in start_msg.reactions:
                 users = await reaction.users().flatten()
@@ -253,16 +280,16 @@ async def on_message(message):
         leaderboard = get_leaderboard()
         output_string = 'Ratings:\n'
         rank = 0
-        last = 0, 0
+        last = 0, 0, 0    # mu, sigma, rank
         for item in leaderboard:
             member = message.guild.get_member(int(item[0]))
             if member:
-                if (item[1].mu, item[1].sigma) == last:
-                    output_string += f'\t{rank}. {member.name} - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
+                rank += 1
+                if (item[1].mu, item[1].sigma) == last[:2]:
+                    output_string += f'\t{last[2]}. {member.name} - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
                 else:
-                    rank += 1
                     output_string += f'\t{rank}. {member.name} - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
-                last = item[1].mu, item[1].sigma
+                last = item[1].mu, item[1].sigma, rank
         await message.channel.send(output_string)
     
     if message.content.startswith('$move'):
@@ -362,4 +389,5 @@ async def on_message(message):
             await message.channel.send('Permission denied.')
 
 keep_alive()
-client.run(os.getenv('TOKEN_TEMP'))
+client.run(os.getenv('TOKEN'))
+# print(db_string())
