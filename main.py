@@ -114,7 +114,7 @@ async def on_raw_reaction_add(payload):
         for reaction in start_msg.reactions:
             users = await reaction.users().flatten()
             players.update((user.id for user in users))
-        output_message = "React to this message if you're playing" + ','.join([f'\t<@!{member}>' for member in players])
+        output_message = "React to this message if you're playing" + ''.join([f'\t<@!{member}>' for member in players])
         await start_msg.edit(content=output_message)
 
 @client.event
@@ -127,7 +127,7 @@ async def on_raw_reaction_remove(payload):
         for reaction in start_msg.reactions:
             users = await reaction.users().flatten()
             players.update((user.id for user in users))
-        output_message = "React to this message if you're playing" + ','.join([f'\t<@!{member}>' for member in players])
+        output_message = "React to this message if you're playing" + ''.join([f'\t<@!{member}>' for member in players])
         await start_msg.edit(content=output_message)
 
 @client.event
@@ -287,9 +287,9 @@ async def on_message(message):
             if member:
                 rank += 1
                 if (item[1].mu, item[1].sigma) == last[:2]:
-                    output_string += f'\t{last[2]}. {member.name} - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
+                    output_string += f'\t**{last[2]}**. ***{member.name}*** - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
                 else:
-                    output_string += f'\t{rank}. {member.name} - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
+                    output_string += f'\t**{rank}**. ***{member.name}*** - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
                 last = item[1].mu, item[1].sigma, rank
         await message.channel.send(output_string)
     
@@ -392,8 +392,8 @@ async def on_message(message):
             await message.channel.send('Permission denied.')
 
     # anti good-bot
-    if message.author.id in GOOD_BOTS:
-        await message.delete()
+    # if message.author.id in GOOD_BOTS:
+    #     await message.delete()
 
 keep_alive()
 client.run(os.getenv('TOKEN'))
