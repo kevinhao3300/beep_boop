@@ -165,18 +165,18 @@ async def on_message(message):
         return
 
     if message.content.startswith('$help'):
-        output_string = "Available Commands:\n"
-        output_string += "\t$start - start matchmaking process, bot sends message for players to react to\n"
-        output_string += "\t\t$make - create random teams from reactions to $start message\n"
-        output_string += "\t\t$rated - create teams based on MMR\n"
-        output_string += "\t\t\t$attackers - record a win for the attackers\n"
-        output_string += "\t\t\t$defenders - record a win for the defenders\n"
-        output_string += "\t\t$move - move players to generated teams' voice channels\n"
-        output_string += "\t\t$back - move all players into attacker voice channel\n"
-        output_string += "\t$rating - get your current rating\n"
-        output_string += "\t$leaderboard - get players sorted by rating\n"
-        output_string += "\t$clean - reset players and remove created voice channels\n"
-        output_string += "\t$help - list available commands"
+        output_string = "**Available Commands:**\n"
+        output_string += "\t**$start** - start matchmaking process, bot sends message for players to react to\n"
+        output_string += "\t\t**$make** - create random teams from reactions to $start message\n"
+        output_string += "\t\t**$rated** - create teams based on MMR\n"
+        output_string += "\t\t\t**$attackers** - record a win for the attackers\n"
+        output_string += "\t\t\t**$defenders** - record a win for the defenders\n"
+        output_string += "\t\t**$move** - move players to generated teams' voice channels\n"
+        output_string += "\t\t**$back** - move all players into attacker voice channel\n"
+        output_string += "\t**$rating** - get your current rating\n"
+        output_string += "\t**$leaderboard** - get players sorted by rating\n"
+        output_string += "\t**$clean** - reset players and remove created voice channels\n"
+        output_string += "\t**$help** - list available commands"
         await message.channel.send(output_string)
 
     if message.content.startswith('$start'):
@@ -218,7 +218,7 @@ async def on_message(message):
     
     if message.content.startswith('$rated'):
         if message.guild.id not in guild_to_start_msg or guild_to_start_msg[message.guild.id] is None:
-            await message.channel.send('use $start before $rated')
+            await message.channel.send('use *$start* before *$rated*')
         else:
             # read reacts
             guild_to_teams[message.guild.id] = {'attackers':[], 'defenders':[]}
@@ -229,7 +229,7 @@ async def on_message(message):
                 players.update((user.id for user in users))
             # must have at least one member on each team
             if len(players) < 2:
-                await message.channel.send('must have at least 2 players for rated game')
+                await message.channel.send('must have **at least 2 players** for rated game')
                 return
             # create teams
             attackers, defenders, quality = make_teams(list(players))
@@ -249,14 +249,14 @@ async def on_message(message):
     
     if message.content.startswith('$attackers'):
         if not guild_to_teams[message.guild.id]['attackers']:
-            await message.channel.send('use $make or $rated before recording a result')
+            await message.channel.send('use *$make* or *$rated* before recording a result')
         else:
             attackers, defenders, attackers_new, defenders_new = record_result(guild_to_teams[message.guild.id]['attackers'], guild_to_teams[message.guild.id]['defenders'])
-            output_string = 'Win for Attackers recorded.\n'
-            output_string += "\nAttackers:\n"
+            output_string = '**Win for** ***Attackers*** **recorded.**\n'
+            output_string += "\n**Attackers:**\n"
             for member in attackers:
                 output_string += f'\t<@!{member}> ({round(attackers[member].mu, 2)} -> {round(attackers_new[member].mu, 2)})\n'
-            output_string += "\n\nDefenders:\n"
+            output_string += "\n\n**Defenders:**\n"
             for member in defenders:
                 output_string += f'\t<@!{member}> ({round(defenders[member].mu, 2)} -> {round(defenders_new[member].mu, 2)})\n'
             # send output
@@ -264,14 +264,14 @@ async def on_message(message):
     
     if message.content.startswith('$defenders'):
         if not guild_to_teams[message.guild.id]['defenders']:
-            await message.channel.send('use $make or $rated before recording a result')
+            await message.channel.send('use *$make* or *$rated* before recording a result')
         else:
             defenders, attackers, defenders_new, attackers_new = record_result(guild_to_teams[message.guild.id]['defenders'], guild_to_teams[message.guild.id]['attackers'])
-            output_string = 'Win for Defenders recorded.\n'
-            output_string += "\nAttackers:\n"
+            output_string = '**Win for** ***Defenders*** **recorded.**\n'
+            output_string += "\n**Attackers:**\n"
             for member in attackers:
                 output_string += f'\t<@!{member}> ({round(attackers[member].mu, 2)} -> {round(attackers_new[member].mu, 2)})\n'
-            output_string += "\n\nDefenders:\n"
+            output_string += "\n\n**Defenders:**\n"
             for member in defenders:
                 output_string += f'\t<@!{member}> ({round(defenders[member].mu, 2)} -> {round(defenders_new[member].mu, 2)})\n'
             # send output
@@ -308,7 +308,7 @@ async def on_message(message):
         if valorant_category is None:
             # make it
             valorant_category = await guild.create_category_channel('VALORANT')
-            await message.channel.send("VALORANT category created.")
+            # await message.channel.send("VALORANT category created.")
         for vc in guild.voice_channels:
             # ignore voice channels outside of VALORANT
             if vc.category != valorant_category:
@@ -320,22 +320,25 @@ async def on_message(message):
         # create vc if necessary
         if attacker_channel is None:
             attacker_channel = await guild.create_voice_channel('attackers', category=valorant_category)
-            await message.channel.send("Attacker voice channel created.")
+            # await message.channel.send("Attacker voice channel created.")
         if defender_channel is None:
             defender_channel = await guild.create_voice_channel('defenders', category=valorant_category)
-            await message.channel.send("Defender voice channel created.")
+            # await message.channel.send("Defender voice channel created.")
         # move members to right channel
         attackers = guild_to_teams[guild.id]['attackers']
         defenders = guild_to_teams[guild.id]['defenders']
+        count = 0
         for attacker in attackers:
             member = guild.get_member(attacker)
             if member.voice is not None:
+                count += 1
                 await member.move_to(attacker_channel)
         for defender in defenders:
             member = guild.get_member(defender)
             if member.voice is not None:
+                count += 1
                 await member.move_to(defender_channel)
-        await message.channel.send("Available players moved.")
+        await message.channel.send(f"{count} player{'s' if count > 1} moved.")
     
     if message.content.startswith('$back'):
         # find VALORANT voice channels
@@ -387,7 +390,7 @@ async def on_message(message):
     if message.content.startswith('$cleardb'):
         if message.author.id in ADMINS:
             clear_db()
-            await message.channel.send('Databased cleared.')
+            await message.channel.send('Database cleared.')
         else:
             await message.channel.send('Permission denied.')
 
