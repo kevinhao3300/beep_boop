@@ -32,7 +32,7 @@ client = discord.Client(intents=intents)
 guild_to_start_msg = dict()
 guild_to_teams = {}
 
-MAPS = ['Bind', 'Split', 'Haven', 'Iceb <:OMEGALUL:821118232614273105> x', 'Ascent']
+MAPS = ['Bind', 'Split', 'Haven', 'Iceb <:OMEGALUL:821118232614273105> x', 'Ascent', 'Breeze']
 
 # TrueSkill Rating Settings
 env = ts.TrueSkill(draw_probability=0.05)
@@ -279,7 +279,7 @@ async def on_message(message):
 
     if message.content.startswith('$leaderboard'):
         leaderboard = get_leaderboard()
-        output_string = 'Ratings:\n'
+        output_string = ''
         rank = 0
         last = 0, 0, 0    # mu, sigma, rank
         for item in leaderboard:
@@ -338,7 +338,7 @@ async def on_message(message):
             if member.voice is not None:
                 count += 1
                 await member.move_to(defender_channel)
-        await message.channel.send(f"{count} player{'s' if count > 1} moved.")
+        await message.channel.send(f"{count} player{'s' if count > 1 else ''} moved.")
     
     if message.content.startswith('$back'):
         # find VALORANT voice channels
