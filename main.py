@@ -13,12 +13,6 @@ handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w'
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
 
-# def update_db(k,v):
-#   if k in db.keys():
-#     db[k].append(v)
-#   else:
-#     db[k] = [v]
-
 def db_string():
   ret = ''
   for k in db.keys():
@@ -32,7 +26,6 @@ def clear_db():
 
 # global userid lists
 ADMINS = [335828416412778496, 263745246821744640]
-GOOD_BOTS = [833472758738190356, 834637993779527722]
 
 # discord py client
 intents = discord.Intents.default()
@@ -416,10 +409,6 @@ async def on_message(message):
             await message.channel.send('Database cleared.')
         else:
             await message.channel.send('Permission denied.')
-
-    # anti good-bot
-    # if message.author.id in GOOD_BOTS:
-    #     await message.delete()
 
 keep_alive()
 client.run(os.getenv('TOKEN'))
