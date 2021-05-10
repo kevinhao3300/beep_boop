@@ -4,6 +4,14 @@ import random
 from replit import db
 from keep_alive import keep_alive
 import trueskill as ts
+import logging
+
+# set up logging
+logger = logging.getLogger('discord')
+logger.setLevel(logging.DEBUG)
+handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+logger.addHandler(handler)
 
 # def update_db(k,v):
 #   if k in db.keys():
@@ -22,21 +30,28 @@ def clear_db():
   for k in db.keys():
     del db[k]
 
-ADMINS = [335828416412778496, 263745246821744640] # discord ids of users w/ admin privledges
+# global userid lists
+ADMINS = [335828416412778496, 263745246821744640]
 GOOD_BOTS = [833472758738190356, 834637993779527722]
 
+# discord py client
 intents = discord.Intents.default()
 intents.members = True
 client = discord.Client(intents=intents)
 
+# dicts for guild-local variables
 guild_to_start_msg = dict()
-guild_to_teams = {}
+guild_to_teams = dict()
 
+# VALORANT maps
 MAPS = ['Bind', 'Split', 'Haven', 'Iceb <:OMEGALUL:821118232614273105> x', 'Ascent', 'Breeze']
 
 # TrueSkill Rating Settings
 env = ts.TrueSkill(draw_probability=0.05)
 env.make_as_global()
+
+# TrueSkill DB cache
+ratings_cache = {}
 
 # TrueSkill DB helper functions
 def get_skill(userid):
@@ -46,11 +61,15 @@ def get_skill(userid):
     :param userid: Discord userid to find
     :return: stored TrueSkill rating object of userid
     '''
+    # check cache first
+    if userid in ratings_cache:
+        return ratings_cache[userid]
     if userid in db.keys():
         mu, sigma = db[userid]
         return ts.Rating(float(mu), float(sigma))
     new_rating = ts.Rating()
     db[userid] = new_rating.mu, new_rating.sigma
+    ratings_cache[userid] = new_rating
     return new_rating
 
 def record_result(winning_team, losing_team):
@@ -64,8 +83,10 @@ def record_result(winning_team, losing_team):
     losing_team_ratings = {id : get_skill(id) for id in losing_team}
     winning_team_ratings_new, losing_team_ratings_new = ts.rate([winning_team_ratings, losing_team_ratings], [0,1])
     for id in winning_team_ratings:
+        ratings_cache[id] = winning_team_ratings_new[id]
         db[id] = winning_team_ratings_new[id].mu, winning_team_ratings_new[id].sigma
     for id in losing_team_ratings:
+        ratings_cache[id] = losing_team_ratings_new[id]
         db[id] = losing_team_ratings_new[id].mu, losing_team_ratings_new[id].sigma
     return winning_team_ratings, losing_team_ratings, winning_team_ratings_new, losing_team_ratings_new
 
@@ -102,6 +123,8 @@ def get_leaderboard():
 
 @client.event
 async def on_ready():
+    global ratings_cache
+    ratings_cache = {id : get_skill(id) for id in db.keys()}
     print('Logged in as {0.user}'.format(client))
 
 @client.event
@@ -287,9 +310,9 @@ async def on_message(message):
             if member:
                 rank += 1
                 if (item[1].mu, item[1].sigma) == last[:2]:
-                    output_string += f'\t**{last[2]}**. ***{member.name}*** - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
+                    output_string += f'**{last[2]}**. ***{member.name}*** - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
                 else:
-                    output_string += f'\t**{rank}**. ***{member.name}*** - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
+                    output_string += f'**{rank}**. ***{member.name}*** - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
                 last = item[1].mu, item[1].sigma, rank
         await message.channel.send(output_string)
     
@@ -400,4 +423,3 @@ async def on_message(message):
 
 keep_alive()
 client.run(os.getenv('TOKEN'))
-# print(db_string())
