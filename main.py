@@ -33,8 +33,8 @@ intents.members = True
 client = discord.Client(intents=intents)
 
 # dicts for guild-local variables
-guild_to_start_msg = dict()
-guild_to_teams = dict()
+guild_to_start_msg = {}
+guild_to_teams = {}
 
 # VALORANT maps
 MAPS = ['Bind', 'Split', 'Haven', 'Iceb <:OMEGALUL:821118232614273105> x', 'Ascent', 'Breeze']
@@ -54,9 +54,11 @@ def get_skill(userid):
     :param userid: Discord userid to find
     :return: stored TrueSkill rating object of userid
     '''
+    userid = int(userid)
     # check cache first
     if userid in ratings_cache:
         return ratings_cache[userid]
+    print('Cache Miss: userid =', userid)
     if userid in db.keys():
         mu, sigma = db[userid]
         return ts.Rating(float(mu), float(sigma))
@@ -130,7 +132,7 @@ async def on_raw_reaction_add(payload):
         for reaction in start_msg.reactions:
             users = await reaction.users().flatten()
             players.update((user.id for user in users))
-        output_message = "React to this message if you're playing" + ''.join([f'\t<@!{member}>' for member in players])
+        output_message = "React to this message if you're playing" + f' ({len(players)})' + ''.join([f'\t<@!{member}>' for member in players] )
         await start_msg.edit(content=output_message)
 
 @client.event
@@ -143,7 +145,7 @@ async def on_raw_reaction_remove(payload):
         for reaction in start_msg.reactions:
             users = await reaction.users().flatten()
             players.update((user.id for user in users))
-        output_message = "React to this message if you're playing" + ''.join([f'\t<@!{member}>' for member in players])
+        output_message = "React to this message if you're playing" + f' ({len(players)})' + ''.join([f'\t<@!{member}>' for member in players])
         await start_msg.edit(content=output_message)
 
 @client.event
