@@ -37,7 +37,7 @@ guild_to_start_msg = {}
 guild_to_teams = {}
 
 # VALORANT maps
-MAPS = ['Bind', 'Split', 'Haven', 'Iceb <:OMEGALUL:821118232614273105> x', 'Ascent', 'Breeze']
+MAPS = ['Bind', 'Split', 'Haven', 'Icebox', 'Ascent', 'Breeze']
 
 # TrueSkill Rating Settings
 env = ts.TrueSkill(draw_probability=0.05)
