@@ -210,68 +210,6 @@ async def on_message(message):
     # ignore your own messages
     if message.author == client:
         return
-
-    if message.content.startswith('$fix'):
-        gid = message.guild.id
-        # before game
-        set_rating(263745246821744640, ts.Rating(37.113, 5.1), gid)
-        set_rating(615234805981904897, ts.Rating(29.4677, 7.82), gid)
-        set_rating(288743200804306944, ts.Rating(29.1361, 5.39), gid)
-        set_rating(287698522067697666, ts.Rating(28.7948, 7.88), gid)
-        set_rating(250848209901977603, ts.Rating(28.7354, 7.6), gid)
-        set_rating(196397483293802496, ts.Rating(28.6357, 5.53), gid)
-        set_rating(163424573520478208, ts.Rating(27.7725, 7.44), gid)
-        set_rating(321713260514770964, ts.Rating(27.7519, 8.03), gid)
-        set_rating(432355335185891332, ts.Rating(27.7519, 8.03), gid)
-        set_rating(377603660760219648, ts.Rating(27.592, 5.21), gid)
-        set_rating(249981070055833600, ts.Rating(26.1833, 5.76), gid)
-        set_rating(548700438120235018, ts.Rating(26.0023, 6.9), gid)
-        set_rating(259912463661793290, ts.Rating(24.0025, 7.11), gid)
-        set_rating(619955027662077962, ts.Rating(23.077, 8.12), gid)
-        set_rating(163154174287020033, ts.Rating(22.9361, 8.07), gid)
-        set_rating(517396282306986005, ts.Rating(22.6771, 7.64), gid)
-        set_rating(190611016428683264, ts.Rating(22.2481, 8.03), gid)
-        set_rating(342107115344625666, ts.Rating(22.229, 7.24), gid)
-        set_rating(264507151769141249, ts.Rating(21.7872, 6.24), gid)
-        set_rating(207768302141964288, ts.Rating(21.0514, 7.84), gid)
-        set_rating(688919431908294745, ts.Rating(19.5455, 6.33), gid)
-        set_rating(186985887496798208, ts.Rating(19.2135, 5.83), gid)
-        set_rating(163477196684525569, ts.Rating(15.3869, 5.73), gid)
-        set_rating(335828416412778496, ts.Rating(15.2875, 5.65), gid)
-        # leaderboard
-        start_time = time.time()
-        leaderboard = get_leaderboard(message.guild.id)
-        if not leaderboard:
-            await message.channel.send('No Ranked Players.')
-            return
-        output_string = ''
-        rank = 0
-        last = 0, 0, 0    # mu, sigma, rank
-        for item in leaderboard:
-            member = message.guild.get_member(int(item[0]))
-            if member:
-                rank += 1
-                if (item[1].mu, item[1].sigma) == last[:2]:
-                    output_string += f'**{last[2]}**. ***{member.name}*** - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
-                else:
-                    output_string += f'**{rank}**. ***{member.name}*** - {round(item[1].mu, 4)} ± {round(item[1].sigma, 2)}\n'
-                last = item[1].mu, item[1].sigma, rank
-        print(f'[{message.guild.id}]: Leaderboard fetched in {round(time.time()-start_time, 4)}s')
-        await message.channel.send(output_string)
-        # game
-        guild_to_teams[message.guild.id] = {'attackers':[249981070055833600, 288743200804306944, 196397483293802496, 335828416412778496], 'defenders':[163477196684525569, 263745246821744640, 688919431908294745, 377603660760219648]}
-        
-        attackers, defenders, attackers_new, defenders_new = record_result(guild_to_teams[message.guild.id]['attackers'], guild_to_teams[message.guild.id]['defenders'], message.guild.id)
-        output_string = '**Win for** ***Attackers*** **recorded.**\n'
-        output_string += "\n**Attackers:**\n"
-        for member in attackers:
-            output_string += f'\t<@!{member}> ({round(attackers[member].mu, 2)} -> {round(attackers_new[member].mu, 2)})\n'
-        output_string += "\n\n**Defenders:**\n"
-        for member in defenders:
-            output_string += f'\t<@!{member}> ({round(defenders[member].mu, 2)} -> {round(defenders_new[member].mu, 2)})\n'
-        # send output
-        await message.channel.send(output_string)
-
         
     if message.content.startswith('$help'):
         print(db_string(message.guild.id))
@@ -361,6 +299,9 @@ async def on_message(message):
             await message.channel.send(output_string)
     
     if message.content.startswith('$attackers'):
+        if message.author.id not in ADMINS:
+            await message.channel.send('Permission Denied ❌. Blame Djaenk')
+            return
         if not guild_to_teams[message.guild.id]['t']:
             await message.channel.send('use *$make* or *$rated* before recording a result')
         else:
@@ -376,6 +317,9 @@ async def on_message(message):
             await message.channel.send(output_string)
     
     if message.content.startswith('$defenders'):
+        if message.author.id not in ADMINS:
+            await message.channel.send('Permission Denied ❌. Blame Djaenk')
+            return
         if not guild_to_teams[message.guild.id]['defenders']:
             await message.channel.send('use *$make* or *$rated* before recording a result')
         else:
